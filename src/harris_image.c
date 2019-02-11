@@ -259,7 +259,7 @@ image nms_image(image im, int w)
         for(int j = 0; j < size_row; ++j){
             for(int i = 0; i < size_column; ++i){
 
-                pixel_reference = get_pixel(r , i, j ,k);
+                pixel_reference = get_pixel(im , i, j ,k);
 
                 /*for neighbors within w:*/
                 for(int y = 0; y < window_size; ++y){
@@ -268,7 +268,7 @@ image nms_image(image im, int w)
                         map_pixel_x = i + x - h_window_size;
                         map_pixel_y = j + y - h_window_size;
 
-                        pixel_comparison = get_pixel(r , map_pixel_x, map_pixel_y ,k);
+                        pixel_comparison = get_pixel(im , map_pixel_x, map_pixel_y ,k);
 
                         if (pixel_comparison > pixel_reference){
 
@@ -311,15 +311,48 @@ descriptor *harris_corner_detector(image im, float sigma, float thresh, int nms,
     // Run NMS on the responses
     image Rnms = nms_image(R, nms);
 
-
     //TODO: count number of responses over threshold
-    int count = 1; // change this
+    int count = 0;
 
-    
+    int size_column = Rnms.w; 
+    int size_row = Rnms.h;
+    int size_channel = Rnms.c;
+    float pixel = 0.0f;
+
+    for(int k = 0; k < size_channel; ++k){
+        for(int j = 0; j < size_row; ++j){
+            for(int i = 0; i < size_column; ++i){
+
+                pixel = get_pixel(Rnms, i, j, k);
+                if (pixel > thresh){
+
+                    count++;
+                }
+
+            }
+        }
+    }
+
     *n = count; // <- set *n equal to number of corners in image.
     descriptor *d = calloc(count, sizeof(descriptor));
     //TODO: fill in array *d with descriptors of corners, use describe_index.
+    int descriptor_count = 0;
 
+    for(int k = 0; k < size_channel; ++k){
+        for(int j = 0; j < size_row; ++j){
+            for(int i = 0; i < size_column; ++i){
+
+                pixel = get_pixel(Rnms, i, j, k);
+                if ((pixel > thresh) && (descriptor_count < count)){
+
+                    d[descriptor_count].p.x = i;
+                    d[descriptor_count].p.y = j;
+                    descriptor_count++;
+                }
+
+            }
+        }
+    }
 
     free_image(S);
     free_image(R);
