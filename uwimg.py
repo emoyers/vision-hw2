@@ -173,6 +173,14 @@ structure_matrix = lib.structure_matrix
 structure_matrix.argtypes = [IMAGE, c_float]
 structure_matrix.restype = IMAGE
 
+cornerness_response = lib.cornerness_response
+cornerness_response.argtypes = [IMAGE]
+cornerness_response.restype = IMAGE
+
+nms_image = lib.nms_image
+nms_image.argtypes = [IMAGE, c_int]
+nms_image.restype = IMAGE
+
 find_and_draw_matches = lib.find_and_draw_matches
 find_and_draw_matches.argtypes = [IMAGE, IMAGE, c_float, c_float, c_int]
 find_and_draw_matches.restype = IMAGE

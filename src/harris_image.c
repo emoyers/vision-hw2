@@ -113,6 +113,91 @@ image smooth_image(image im, float sigma)
 image structure_matrix(image im, float sigma)
 {
     image S = make_image(im.w, im.h, 3);
+    S.data = calloc(im.w*im.h*3, sizeof(float));
+
+    image f_sobel_x = make_gx_filter();
+    image f_sobel_y = make_gy_filter();
+    image I_x = convolve_image(im, f_sobel_x, 0);
+    image I_y = convolve_image(im, f_sobel_y, 0);
+
+    assert( (I_x.h == I_y.h) && (I_x.w == I_y.w) && (I_x.c == I_y.c));
+
+    float pixel_Ix = 0.0f;
+    float pixel_Iy = 0.0f;
+    float pixel_S = 0.0f;
+    int size_column = I_x.w; 
+    int size_row = I_x.h;
+    int size_channel = I_x.c;
+
+    image IxIx = make_image(I_x.w, I_x.h, I_x.c);
+    IxIx.data = calloc(I_x.w*I_x.h*I_x.c, sizeof(float));
+
+    image IyIy = make_image(I_y.w, I_y.h, I_y.c);
+    IxIx.data = calloc(I_y.w*I_y.h*I_y.c, sizeof(float));
+
+    image IxIy = make_image(I_x.w, I_x.h, I_x.c);
+    IxIy.data = calloc(I_x.w*I_x.h*I_x.c, sizeof(float));
+
+    for(int k = 0; k < size_channel; ++k){
+        for(int j = 0; j < size_row; ++j){
+            for(int i = 0; i < size_column; ++i){
+                pixel_Ix = get_pixel(I_x , i, j ,k);
+                pixel_Iy = get_pixel(I_y , i, j ,k);
+
+                set_pixel(IxIx, i, j ,k, pixel_Ix*pixel_Ix);
+                set_pixel(IyIy, i, j ,k, pixel_Iy*pixel_Iy);
+                set_pixel(IxIy, i, j ,k, pixel_Ix*pixel_Iy);
+
+            }
+        }
+    }
+
+    image filter = make_gaussian_filter(sigma);
+    image IxIx_blur = convolve_image(IxIx, filter, 1);
+    image IyIy_blur = convolve_image(IyIy, filter, 1);
+    image IxIy_blur = convolve_image(IxIy, filter, 1);
+
+    assert( (IxIx_blur.c == 1) && (IyIy_blur.c == 1) && (IxIy_blur.c == 1));
+
+    size_column = S.w; 
+    size_row = S.h;
+    size_channel = S.c;
+
+    for(int k = 0; k < size_channel; ++k){
+        for(int j = 0; j < size_row; ++j){
+            for(int i = 0; i < size_column; ++i){
+
+                if(k==0)
+                {
+                    pixel_S = get_pixel(IxIx_blur , i, j ,k);
+                }
+                else if(k==1)
+                {
+                    pixel_S = get_pixel(IyIy_blur , i, j ,k);
+                }
+                else
+                {
+                    pixel_S = get_pixel(IxIy_blur , i, j ,k);
+                }
+
+
+                set_pixel(S, i, j ,k, pixel_S);
+
+            }
+        }
+    }
+
+    free_image(f_sobel_x);
+    free_image(f_sobel_y);
+    free_image(I_x);
+    free_image(I_y);
+    free_image(IxIx);
+    free_image(IyIy);
+    free_image(IxIy);
+    free_image(filter);
+    free_image(IxIx_blur);
+    free_image(IyIy_blur);
+    free_image(IxIy_blur);
     // TODO: calculate structure matrix for im.
     return S;
 }
@@ -123,8 +208,32 @@ image structure_matrix(image im, float sigma)
 image cornerness_response(image S)
 {
     image R = make_image(S.w, S.h, 1);
+    R.data = calloc(S.w*S.h*1, sizeof(float));
+    float pixel_IxIx = 0.0f;
+    float pixel_IyIy = 0.0f;
+    float pixel_IxIy = 0.0f;
+    float determinant = 0.0f;
+    float trace = 0.0f;
+    float cornerness_result = 0.0f;
+    int size_column = R.w; 
+    int size_row = R.h;
     // TODO: fill in R, "cornerness" for each pixel using the structure matrix.
     // We'll use formulation det(S) - alpha * trace(S)^2, alpha = .06.
+    for(int j = 0; j < size_row; ++j){
+        for(int i = 0; i < size_column; ++i){
+
+            pixel_IxIx = get_pixel(S , i, j ,0);
+            pixel_IyIy = get_pixel(S , i, j ,1);
+            pixel_IxIy = get_pixel(S , i, j ,2);
+            determinant = (pixel_IxIx * pixel_IyIy) -(pixel_IxIy * pixel_IxIy);
+            trace = (pixel_IxIx + pixel_IyIy);
+            cornerness_result = determinant - (0.06 * trace * trace);
+
+            set_pixel(R, i, j ,0, cornerness_result);
+
+        }
+    }
+
     return R;
 }
 
@@ -135,6 +244,47 @@ image cornerness_response(image S)
 image nms_image(image im, int w)
 {
     image r = copy_image(im);
+
+    int size_column = r.w; 
+    int size_row = r.h;
+    int size_channel = r.c;
+    float pixel_reference = 0.0f;
+    float pixel_comparison = 0.0f;
+    int window_size = (2 * w + 1);
+    int h_window_size = (int)(window_size / 2);
+    int map_pixel_x = 0;
+    int map_pixel_y = 0;
+
+    for(int k = 0; k < size_channel; ++k){
+        for(int j = 0; j < size_row; ++j){
+            for(int i = 0; i < size_column; ++i){
+
+                pixel_reference = get_pixel(r , i, j ,k);
+
+                /*for neighbors within w:*/
+                for(int y = 0; y < window_size; ++y){
+                    for(int x = 0; x < window_size; ++x){
+
+                        map_pixel_x = i + x - h_window_size;
+                        map_pixel_y = j + y - h_window_size;
+
+                        pixel_comparison = get_pixel(r , map_pixel_x, map_pixel_y ,k);
+
+                        if (pixel_comparison > pixel_reference){
+
+                            r.data[i+j*size_column+k*size_column*size_row] = -999999;
+                            /*exit fors x and y*/
+                            y =  window_size;
+                            x =  window_size;
+                        }
+
+                    }
+                }
+                /*for neighbors within w:*/
+
+            }
+        }
+    }
     // TODO: perform NMS on the response map.
     // for every pixel in the image:
     //     for neighbors within w:
