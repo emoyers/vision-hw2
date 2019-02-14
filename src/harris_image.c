@@ -83,8 +83,24 @@ void mark_corners(image im, descriptor *d, int n)
 // returns: single row image of the filter.
 image make_1d_gaussian(float sigma)
 {
-    // TODO: optional, make separable 1d Gaussian.
-    return make_image(1,1,1);
+    int w_sigma = (int)(6.0f*sigma);
+    if ((w_sigma%2) == 0 ) {
+        w_sigma++;
+    }
+    image gaussian = make_image(w_sigma, 1, 1);
+    gaussian.data = calloc(gaussian.w*1*1, sizeof(float));
+    float gaussian_r = 0.0f;
+    int size_column = gaussian.w; 
+    float x_gaussian = 0.0f;
+
+    for(int i = 0; i < size_column; ++i){
+        x_gaussian = (float)(i - (size_column / 2));
+        gaussian_r = (1.0f/(TWOPI*sigma*sigma))*exp(((-1.0f)*(x_gaussian*x_gaussian))/(2*sigma*sigma));
+        set_pixel(gaussian, i, 0, 0, gaussian_r);             
+    }
+
+    l1_normalize(gaussian);
+    return gaussian;
 }
 
 // Smooths an image using separable Gaussian filter.
@@ -93,16 +109,31 @@ image make_1d_gaussian(float sigma)
 // returns: smoothed image.
 image smooth_image(image im, float sigma)
 {
-    if(1){
-        image g = make_gaussian_filter(sigma);
-        image s = convolve_image(im, g, 1);
-        free_image(g);
-        return s;
-    } else {
-        // TODO: optional, use two convolutions with 1d gaussian filter.
-        // If you implement, disable the above if check.
-        return copy_image(im);
+
+    // TODO: optional, use two convolutions with 1d gaussian filter.
+    // If you implement, disable the above if check.
+    image filter_1d = make_1d_gaussian(sigma);
+    image s_ = convolve_image(im, filter_1d, 1);
+
+    image filter_1d_inv = make_image(filter_1d.h, filter_1d.w, filter_1d.c);
+    filter_1d_inv.data = calloc(filter_1d.h*filter_1d.w*filter_1d.c, sizeof(float));
+
+    int size_column = filter_1d.w;
+    float pixel = 0.0f; 
+
+    for(int i = 0; i < size_column; ++i){
+        pixel = get_pixel(filter_1d, i, 0, 0);
+        set_pixel(filter_1d_inv, 0, i, 0, pixel);
     }
+
+    image conv_image = convolve_image(s_, filter_1d_inv, 1);
+
+    free_image(filter_1d);
+    free_image(s_);
+    free_image(filter_1d_inv);
+
+    return conv_image;
+
 }
 
 // Calculate the structure matrix of an image.
@@ -152,10 +183,9 @@ image structure_matrix(image im, float sigma)
         }
     }
 
-    image filter = make_gaussian_filter(sigma);
-    image IxIx_blur = convolve_image(IxIx, filter, 1);
-    image IyIy_blur = convolve_image(IyIy, filter, 1);
-    image IxIy_blur = convolve_image(IxIy, filter, 1);
+    image IxIx_blur = smooth_image(IxIx, sigma);
+    image IyIy_blur = smooth_image(IyIy, sigma);
+    image IxIy_blur = smooth_image(IxIy, sigma);
 
     assert( (IxIx_blur.c == 1) && (IyIy_blur.c == 1) && (IxIy_blur.c == 1));
 
@@ -194,7 +224,6 @@ image structure_matrix(image im, float sigma)
     free_image(IxIx);
     free_image(IyIy);
     free_image(IxIy);
-    free_image(filter);
     free_image(IxIx_blur);
     free_image(IyIy_blur);
     free_image(IxIy_blur);
@@ -333,6 +362,16 @@ descriptor *harris_corner_detector(image im, float sigma, float thresh, int nms,
         }
     }
 
+    image *sobel = sobel_image(im);
+    image grad_image = copy_image(sobel[1]);
+    feature_normalize(grad_image);
+    int size_column_descriptor = 5;
+    int size_row_descriptor = 5;
+    int mid_size_descriptor = (int)(size_row_descriptor/2); 
+    int map_descriptor_x = 0;
+    int map_descriptor_y = 0;
+    float descriptor_pixel = 0.0f;
+
     *n = count; // <- set *n equal to number of corners in image.
     descriptor *d = calloc(count, sizeof(descriptor));
     //TODO: fill in array *d with descriptors of corners, use describe_index.
@@ -347,6 +386,21 @@ descriptor *harris_corner_detector(image im, float sigma, float thresh, int nms,
 
                     d[descriptor_count].p.x = i;
                     d[descriptor_count].p.y = j;
+                    d[descriptor_count].n = size_column_descriptor*size_row_descriptor ;
+                    d[descriptor_count].data = calloc(size_column_descriptor*size_row_descriptor , sizeof(float));
+
+                    for(int l = 0; l < size_row_descriptor; ++l){
+                        for(int m = 0; m < size_column_descriptor; ++m){
+
+                            map_descriptor_x = i - mid_size_descriptor +m;
+                            map_descriptor_y = j - mid_size_descriptor +l;
+                            descriptor_pixel = get_pixel(grad_image, map_descriptor_x, map_descriptor_y, 0);
+                            d[descriptor_count].data[m+(l*size_row_descriptor)] = descriptor_pixel;
+                        }
+                    }
+                    
+
+
                     descriptor_count++;
                 }
 
@@ -357,6 +411,8 @@ descriptor *harris_corner_detector(image im, float sigma, float thresh, int nms,
     free_image(S);
     free_image(R);
     free_image(Rnms);
+    free_image(grad_image);
+    free(sobel);
     return d;
 }
 

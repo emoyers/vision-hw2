@@ -118,7 +118,13 @@ image find_and_draw_matches(image a, image b, float sigma, float thresh, int nms
 float l1_distance(float *a, float *b, int n)
 {
     // TODO: return the correct number.
-    return 0;
+    float sum = 0.0f;
+    float temp = 0.0f;
+    for(int i=0; i<n ;++i){
+        temp = a[i] - b [i];
+        sum += fabs(temp);
+    }
+    return sum;
 }
 
 // Finds best matches between descriptors of two images.
@@ -130,33 +136,138 @@ float l1_distance(float *a, float *b, int n)
 match *match_descriptors(descriptor *a, int an, descriptor *b, int bn, int *mn)
 {
     int i,j;
+    float least_l1_dist = 0.0f;
+    float l1_dist = 0.0f;
 
     // We will have at most an matches.
     *mn = an;
     match *m = calloc(an, sizeof(match));
     for(j = 0; j < an; ++j){
         // TODO: for every descriptor in a, find best match in b.
-        // record ai as the index in *a and bi as the index in *b.
         int bind = 0; // <- find the best match
+        for(i = 0; i < bn; ++i){
+            l1_dist = l1_distance(a[j].data, b[i].data, a[j].n);
+            if (i == 0){
+                least_l1_dist = l1_dist;
+            }
+            else{
+                if (least_l1_dist > l1_dist){
+                    least_l1_dist = l1_dist;
+                    bind = i;
+                }
+            }
+        }
+        // record ai as the index in *a and bi as the index in *b.
         m[j].ai = j;
         m[j].bi = bind; // <- should be index in b.
         m[j].p = a[j].p;
         m[j].q = b[bind].p;
-        m[j].distance = 0; // <- should be the smallest L1 distance!
+        m[j].distance = least_l1_dist; // <- should be the smallest L1 distance!
     }
 
+    quickSort(m, 0, an-1);
+
+
     int count = 0;
+    int error = 0;
     int *seen = calloc(bn, sizeof(int));
     // TODO: we want matches to be injective (one-to-one).
-    // Sort matches based on distance using match_compare and qsort.
-    // Then throw out matches to the same element in b. Use seen to keep track.
-    // Each point should only be a part of one match.
-    // Some points will not be in a match.
-    // In practice just bring good matches to front of list, set *mn.
+    for(j = 0; j < an; ++j){
+        error = 0;
+        if (count == 0){
+            seen[count] = m[j].bi;
+            count++;
+        }
+        else{
+            for(i = 0; i < count; ++i){
+                if(seen[i] == m[j].bi){
+                    /*discard elements a swap previous element forward*/
+                    m[j].distance = 2000;
+                    error = 1;
+                    break;
+                }
+            }
+            if (error == 0){
+                seen[count] = m[j].bi;
+                count++;
+            }
+        }
+    }
+
+    quickSort(m, 0, an-1);
+
     *mn = count;
     free(seen);
     return m;
 }
+
+// A utility function to swap two elements 
+void swap_matches(match* a, match* b) 
+{ 
+    match t;
+    t.p = a->p; 
+    t.q = a->q;
+    t.ai = a->ai;
+    t.bi = a->bi;
+    t.distance = a->distance;
+
+    a->p = b->p; 
+    a->q = b->q;
+    a->ai = b->ai;
+    a->bi = b->bi;
+    a->distance = b->distance;
+
+    b->p = t.p; 
+    b->q = t.q;
+    b->ai = t.ai;
+    b->bi = t.bi;
+    b->distance = t.distance;
+} 
+
+
+/* This function takes last element as pivot, places 
+   the pivot element at its correct position in sorted 
+    array, and places all smaller (smaller than pivot) 
+   to left of pivot and all greater elements to right 
+   of pivot */
+int partition_match (match arr[], int low, int high) 
+{ 
+    match pivot = arr[high];    // pivot 
+    int i = (low - 1);  // Index of smaller element 
+  
+    for (int j = low; j <= high- 1; j++) 
+    { 
+        // If current element is smaller than or 
+        // equal to pivot 
+        int result_compare = match_compare(&arr[j],  &pivot);
+        if (result_compare < 1) 
+        { 
+            i++;    // increment index of smaller element 
+            swap_matches(&arr[i], &arr[j]); 
+        } 
+    } 
+    swap_matches(&arr[i + 1], &arr[high]); 
+    return (i + 1); 
+} 
+  
+/* The main function that implements QuickSort 
+ arr[] --> Array to be sorted, 
+  low  --> Starting index, 
+  high  --> Ending index */
+void quickSort(match arr[], int low, int high) 
+{ 
+    if (low < high) 
+    { 
+        /* pi is partitioning index, arr[p] is now 
+           at right place */
+        int pi = partition_match(arr, low, high); 
+  
+        // Separately sort elements before 
+        // partition and after partition 
+        quickSort(arr, low, pi - 1); 
+        quickSort(arr, pi + 1, high); 
+    } 
+} 
 
 // Apply a projective transformation to a point.
 // matrix H: homography to project point.
