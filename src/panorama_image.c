@@ -276,10 +276,18 @@ void quickSort(match arr[], int low, int high)
 point project_point(matrix H, point p)
 {
     matrix c = make_matrix(3, 1);
+    c.data[0][0] = p.x;
+    c.data[1][0] = p.y;
+    c.data[2][0] = 1;
+
+    matrix matrix_new_points = matrix_mult_matrix(H, c);
+
+    double x_new = matrix_new_points.data[0][0] / matrix_new_points.data[2][0];
+    double y_new = matrix_new_points.data[1][0] / matrix_new_points.data[2][0];
     // TODO: project point p with homography H.
     // Remember that homogeneous coordinates are equivalent up to scalar.
     // Have to divide by.... something...
-    point q = make_point(0, 0);
+    point q = make_point(x_new, y_new);
     return q;
 }
 
@@ -289,7 +297,15 @@ point project_point(matrix H, point p)
 float point_distance(point p, point q)
 {
     // TODO: should be a quick one.
-    return 0;
+    float result = 0.0f;
+    float distance_x = 0.0f;
+    float distance_y = 0.0f;
+
+    distance_x = p.x - q.x;
+    distance_y = p.x - q.x;
+    result =  sqrt(distance_x*distance_x + distance_y*distance_y);
+
+    return result;
 }
 
 // Count number of inliers in a set of matches. Should also bring inliers

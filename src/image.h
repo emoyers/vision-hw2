@@ -99,6 +99,8 @@ descriptor *harris_corner_detector(image im, float sigma, float thresh, int nms,
 image panorama_image(image a, image b, float sigma, float thresh, int nms, float inlier_thresh, int iters, int cutoff);
 
 void swap_matches(match* a, match* b);
+int partition_match (match arr[], int low, int high);
+void quickSort(match arr[], int low, int high);
 
 #endif
 
