@@ -101,6 +101,7 @@ image panorama_image(image a, image b, float sigma, float thresh, int nms, float
 void swap_matches(match* a, match* b);
 int partition_match (match arr[], int low, int high);
 void quickSort(match arr[], int low, int high);
+void randomize_matches(match *m, int n);
 
 #endif
 

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
+#include <time.h> 
 #include "image.h"
 #include "matrix.h"
 
@@ -321,8 +322,23 @@ int model_inliers(matrix H, match *m, int n, float thresh)
 {
     int i;
     int count = 0;
+    point p_prime = make_point(0, 0);
+    float distance_points = 0.0f;
     // TODO: count number of matches that are inliers
     // i.e. distance(H*p, q) < thresh
+    for(i=0 ; i<n; i++){
+        p_prime = project_point(H, m[i].p);
+        distance_points = point_distance(p_prime, m[i].q);
+
+        if (distance_points < thresh){
+            if(count != i){
+                swap_matches(&m[i], &m[count]); 
+            }
+            count++;
+        }
+
+
+    }
     // Also, sort the matches m so the inliers are the first 'count' elements.
     return count;
 }
@@ -333,6 +349,14 @@ int model_inliers(matrix H, match *m, int n, float thresh)
 void randomize_matches(match *m, int n)
 {
     // TODO: implement Fisher-Yates to shuffle the array.
+    int num = 0;
+    for (int i = 0; i < n; ++i)
+    {   
+        srand(time(0));
+        num = (rand() % (n-i));
+        swap_matches(&m[num], &m[n-1-i]);
+    }
+
 }
 
 // Computes homography between two images given matching pixels.
@@ -351,6 +375,29 @@ matrix compute_homography(match *matches, int n)
         double y  = matches[i].p.y;
         double yp = matches[i].q.y;
         // TODO: fill in the matrices M and b.
+        int index_1_row = 2 * i;
+        int index_2_row = (2 * i) + 1;
+        M.data[index_1_row][0] = x;
+        M.data[index_1_row][1] = y;
+        M.data[index_1_row][2] = 1;
+        M.data[index_1_row][3] = 0;
+        M.data[index_1_row][4] = 0;
+        M.data[index_1_row][5] = 0;
+        M.data[index_1_row][6] = x * (-xp);
+        M.data[index_1_row][7] = y * (-xp);
+
+        b.data[index_1_row][0] = xp;
+
+        M.data[index_2_row][0] = 0;
+        M.data[index_2_row][1] = 0;
+        M.data[index_2_row][2] = 0;
+        M.data[index_2_row][3] = x;
+        M.data[index_2_row][4] = y;
+        M.data[index_2_row][5] = 1;
+        M.data[index_2_row][6] = x * (-yp);
+        M.data[index_2_row][7] = y * (-yp);
+
+        b.data[index_2_row][0] = yp;
 
     }
     matrix a = solve_system(M, b);
@@ -362,7 +409,15 @@ matrix compute_homography(match *matches, int n)
 
     matrix H = make_matrix(3, 3);
     // TODO: fill in the homography H based on the result in a.
-
+    H.data[0][0] = a.data[0][0];
+    H.data[0][1] = a.data[1][0];
+    H.data[0][2] = a.data[2][0];
+    H.data[1][0] = a.data[3][0];
+    H.data[1][1] = a.data[4][0];
+    H.data[1][2] = a.data[5][0];
+    H.data[2][0] = a.data[6][0];
+    H.data[2][1] = a.data[7][0];
+    H.data[2][2] = 1;
 
     free_matrix(a);
     return H;
@@ -379,17 +434,37 @@ matrix RANSAC(match *m, int n, float thresh, int k, int cutoff)
 {
     int e;
     int best = 0;
+    int count_inliers = 0;
     matrix Hb = make_translation_homography(256, 0);
+    matrix H = make_matrix(3,3); 
     // TODO: fill in RANSAC algorithm.
     // for k iterations:
+    for (int i = 0; i < k; ++i)
+    {
     //     shuffle the matches
+        randomize_matches(m,n);
     //     compute a homography with a few matches (how many??)
+        H = compute_homography(m, 4);
     //     if new homography is better than old (how can you tell?):
+        count_inliers = model_inliers(H, m, n, thresh);
+        if(count_inliers > best){
     //         compute updated homography using all inliers
+            Hb = compute_homography(m, count_inliers);
     //         remember it and how good it is
+            best = count_inliers;
+        }
+
+        if (best >= cutoff){
+            printf("best:%d\n",best);
+            free_matrix(H);
+            return Hb;
+        }
     //         if it's better than the cutoff:
     //             return it immediately
     // if we get to the end return the best homography
+    }
+
+    free_matrix(H);
     return Hb;
 }
 

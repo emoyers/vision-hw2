@@ -384,6 +384,19 @@ void test_cornerness()
     free_image(gt);
 }
 
+void my_test(){
+    image a = load_image("data/Rainier1.png");
+    image b = load_image("data/Rainier2.png");
+    int an = 0;
+    int bn = 0;
+    int mn = 0;
+    descriptor *ad = harris_corner_detector(a, 2, 50, 3, &an);
+    descriptor *bd = harris_corner_detector(b, 2, 50, 3, &bn);
+    match *m = match_descriptors(ad, an, bd, bn, &mn);
+    randomize_matches(m, mn);
+
+}
+
 void run_tests()
 {
     //test_matrix();
@@ -408,6 +421,7 @@ void run_tests()
     test_sobel();
     test_structure();
     test_cornerness();
+    //my_test();
     printf("%d tests, %d passed, %d failed\n", tests_total, tests_total-tests_fail, tests_fail);
 }
 
