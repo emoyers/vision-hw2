@@ -455,7 +455,6 @@ matrix RANSAC(match *m, int n, float thresh, int k, int cutoff)
         }
 
         if (best >= cutoff){
-            printf("best:%d\n",best);
             free_matrix(H);
             return Hb;
         }
@@ -463,7 +462,6 @@ matrix RANSAC(match *m, int n, float thresh, int k, int cutoff)
     //             return it immediately
     // if we get to the end return the best homography
     }
-
     free_matrix(H);
     return Hb;
 }
@@ -503,6 +501,8 @@ image combine_images(image a, image b, matrix H)
     }
 
     int i,j,k;
+    float pixel_a = 0.0f;
+    float pixel_b = 0.0f;
     image c = make_image(w, h, a.c);
     
     // Paste image a into the new image offset by dx and dy.
@@ -510,11 +510,29 @@ image combine_images(image a, image b, matrix H)
         for(j = 0; j < a.h; ++j){
             for(i = 0; i < a.w; ++i){
                 // TODO: fill in.
+                pixel_a = get_pixel(a, i, j, k);
+                set_pixel(c,(i-dx), (j-dy), k, pixel_a);
             }
         }
     }
 
     // TODO: Paste in image b as well.
+
+    point proyected_b = project_point(H, make_point(0,0));
+
+    for(k = 0; k < c.c; ++k){
+        for(j = 0; j < c.h; ++j){
+            for(i = 0; i < c.w; ++i){
+                proyected_b = project_point(H, make_point(i,j));
+                if ((proyected_b.x >= 0.0f) && (proyected_b.y >= 0.0f) && (proyected_b.x < b.w) && (proyected_b.y < b.h))
+                {
+                    /* code */
+                    pixel_b = bilinear_interpolate(b, proyected_b.x, proyected_b.y, k);
+                    set_pixel(c, (i-dx), (j-dy), k, pixel_b);
+                }
+            }
+        }
+    }
     // You should loop over some points in the new image (which? all?)
     // and see if their projection from a coordinates to b coordinates falls
     // inside of the bounds of image b. If so, use bilinear interpolation to
@@ -548,7 +566,8 @@ image panorama_image(image a, image b, float sigma, float thresh, int nms, float
     // Run RANSAC to find the homography
     matrix H = RANSAC(m, mn, inlier_thresh, iters, cutoff);
 
-    if(1){
+    /*set if to 1 to safe the picture of the inliers*/
+    if(0){
         // Mark corners and matches between images
         mark_corners(a, ad, an);
         mark_corners(b, bd, bn);

@@ -384,6 +384,7 @@ descriptor *harris_corner_detector(image im, float sigma, float thresh, int nms,
                 pixel = get_pixel(Rnms, i, j, k);
                 if ((pixel > thresh) && (descriptor_count < count)){
 
+                    /* Option 1*/
                     d[descriptor_count].p.x = i;
                     d[descriptor_count].p.y = j;
                     d[descriptor_count].n = size_column_descriptor*size_row_descriptor ;
@@ -398,8 +399,11 @@ descriptor *harris_corner_detector(image im, float sigma, float thresh, int nms,
                             d[descriptor_count].data[m+(l*size_row_descriptor)] = descriptor_pixel;
                         }
                     }
-                    
+                    /* Option 1*/
 
+                    /*Option 2
+                    d[descriptor_count] = describe_index(im, (i+(j*size_column)));
+                    /*Option 2*/
 
                     descriptor_count++;
                 }
